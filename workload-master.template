@@ -1,0 +1,1575 @@
+{
+    "AWSTemplateFormatVersion": "2010-09-09",
+    "Description": "FortiGate Autoscale Solution (with Transit Gateway integration). This template deploys Fortinet FortiGate cluster integrated with Transit Gateway. Please see the documentation for more details. **WARNING** You will be billed for the FortiGate On-Demand instances and related AWS resources if you create a stack from this template.",
+    "Parameters": {
+        "ResourceTagPrefix": {
+            "Type": "String",
+            "AllowedPattern": "[0-9a-zA-Z@.#-]+",
+            "MaxLength": 64,
+            "ConstraintDescription": "Resource tag prefix can include numbers, lowercase letters, uppercase letters, ampersat(@) , hyphens (-), period (.), and hash (#). Max length is 64.",
+            "Description": "A prefix for the tag key ResourceGroup on all resources. It's also used as the name prefix of all applicable resources. Can only contain numbers, lowercase letters, uppercase letters, ampersat(@) , hyphens (-), period (.), and hash (#). Max length is 64."
+        },
+        "AZ1": {
+            "Type": "AWS::EC2::AvailabilityZone::Name",
+            "Description": "Enter the AZ1"
+        },
+        "AZ2": {
+            "Type": "AWS::EC2::AvailabilityZone::Name",
+            "Description": "Enter the AZ2"
+        },
+        "S3BucketName": {
+            "Type": "String",
+            "AllowedPattern": "^[0-9a-zA-Z]+([0-9a-zA-Z-]*[0-9a-zA-Z])*$",
+            "ConstraintDescription": "Deployment related resource bucket name can include numbers, lowercase letters, uppercase letters, and hyphens (-). It cannot start or end with a hyphen (-).",
+            "Description": "S3 bucket name for the deployment package. Can contain numbers, lowercase letters, uppercase letters, and hyphens (-). It cannot start or end with a hyphen (-)."
+        },
+        "S3BucketRegion": {
+            "Type": "String",
+            "Description": "Select the Region where the Init S3 Bucket exists *** the bucket should exist in the same region as this deployment for successful bootstrapping ***",
+            "AllowedValues": [
+                "ap-east-1",
+                "ap-northeast-1",
+                "ap-northeast-2",
+                "ap-south-1",
+                "ap-southeast-1",
+                "ap-southeast-2",
+                "ca-central-1",
+                "eu-central-1",
+                "eu-north-1",
+                "eu-west-1",
+                "eu-west-2",
+                "eu-west-3",
+                "me-south-1",
+                "sa-east-1",
+                "us-east-1",
+                "us-east-2",
+                "us-west-1",
+                "us-west-2"
+            ]
+        },
+        "FortiOSVersion": {
+            "Type": "String",
+            "Default": "LATEST",
+            "AllowedValues": [
+                "LATEST",
+                "623",
+                "642"
+            ],
+            "ConstraintDescription": "must be a valid FortiOS version from the selection.",
+            "Description": "Supported FortiOS versions. The 'LATEST' version can be found in template parameter 'FortiGateKeyMap.FortiGateVersion' in the 'Mappings section."
+        },
+        "KeyPairName": {
+            "Type": "AWS::EC2::KeyPair::KeyName",
+            "ConstraintDescription": "must specify an admin access key pair for FortiGate instances.",
+            "Description": "Amazon EC2 Key Pair for admin access."
+        },
+        "EXTVpcCidr": {
+            "Type": "String",
+            "Default": "192.168.0.0/18",
+            "AllowedPattern": "^(([0-9]|[1-9][0-9]|1[0-9][0-9]|2[0-4][0-9]|25[0-5])\\.){3}([0-9]|[1-9][0-9]|1[0-9][0-9]|2[0-4][0-9]|25[0-5]){1}(\\/([0-9]|[1-2][0-9]|3[0-2]))?$",
+            "ConstraintDescription": "must be a valid CIDR block format.",
+            "Description": "The CIDR block for the External Security VPC."
+        },
+        "EXTPublic1Subnet": {
+            "Type": "String",
+            "Default": "192.168.1.0/24",
+            "AllowedPattern": "^(([0-9]|[1-9][0-9]|1[0-9][0-9]|2[0-4][0-9]|25[0-5])\\.){3}([0-9]|[1-9][0-9]|1[0-9][0-9]|2[0-4][0-9]|25[0-5]){1}(\\/([0-9]|[1-2][0-9]|3[0-2]))?$",
+            "Description": "Enter the value of the Public1 subnet- External VPC"
+        },
+        "EXTPublic2Subnet": {
+            "Type": "String",
+            "Default": "192.168.2.0/24",
+            "AllowedPattern": "^(([0-9]|[1-9][0-9]|1[0-9][0-9]|2[0-4][0-9]|25[0-5])\\.){3}([0-9]|[1-9][0-9]|1[0-9][0-9]|2[0-4][0-9]|25[0-5]){1}(\\/([0-9]|[1-2][0-9]|3[0-2]))?$",
+            "Description": "Enter the value of the Public2 subnet - External VPC"
+        },
+        "EXTPrivate1Subnet": {
+            "Type": "String",
+            "Default": "192.168.3.0/24",
+            "AllowedPattern": "^(([0-9]|[1-9][0-9]|1[0-9][0-9]|2[0-4][0-9]|25[0-5])\\.){3}([0-9]|[1-9][0-9]|1[0-9][0-9]|2[0-4][0-9]|25[0-5]){1}(\\/([0-9]|[1-2][0-9]|3[0-2]))?$",
+            "Description": "Enter the value of the Private1 subnet - External VPC"
+        },
+        "EXTPrivate2Subnet": {
+            "Type": "String",
+            "Default": "192.168.4.0/24",
+            "AllowedPattern": "^(([0-9]|[1-9][0-9]|1[0-9][0-9]|2[0-4][0-9]|25[0-5])\\.){3}([0-9]|[1-9][0-9]|1[0-9][0-9]|2[0-4][0-9]|25[0-5]){1}(\\/([0-9]|[1-2][0-9]|3[0-2]))?$",
+            "Description": "Enter the value of the Private2 subnet-External VPC"
+        },
+        "EXTHA1Subnet": {
+            "Type": "String",
+            "Default": "192.168.5.0/24",
+            "AllowedPattern": "^(([0-9]|[1-9][0-9]|1[0-9][0-9]|2[0-4][0-9]|25[0-5])\\.){3}([0-9]|[1-9][0-9]|1[0-9][0-9]|2[0-4][0-9]|25[0-5]){1}(\\/([0-9]|[1-2][0-9]|3[0-2]))?$",
+            "Description": "Enter the value of the HA1 subnet - External VPC"
+        },
+        "EXTHA2Subnet": {
+            "Type": "String",
+            "Default": "192.168.6.0/24",
+            "AllowedPattern": "^(([0-9]|[1-9][0-9]|1[0-9][0-9]|2[0-4][0-9]|25[0-5])\\.){3}([0-9]|[1-9][0-9]|1[0-9][0-9]|2[0-4][0-9]|25[0-5]){1}(\\/([0-9]|[1-2][0-9]|3[0-2]))?$",
+            "Description": "Enter the value of the HA2 subnet - External VPC"
+        },
+        "EXTMGMT1Subnet": {
+            "Type": "String",
+            "Default": "192.168.7.0/24",
+            "AllowedPattern": "^(([0-9]|[1-9][0-9]|1[0-9][0-9]|2[0-4][0-9]|25[0-5])\\.){3}([0-9]|[1-9][0-9]|1[0-9][0-9]|2[0-4][0-9]|25[0-5]){1}(\\/([0-9]|[1-2][0-9]|3[0-2]))?$",
+            "Description": "Enter the value of the MGMT1 subnet - External VPC"
+        },
+        "EXTMGMT2Subnet": {
+            "Type": "String",
+            "Default": "192.168.8.0/24",
+            "AllowedPattern": "^(([0-9]|[1-9][0-9]|1[0-9][0-9]|2[0-4][0-9]|25[0-5])\\.){3}([0-9]|[1-9][0-9]|1[0-9][0-9]|2[0-4][0-9]|25[0-5]){1}(\\/([0-9]|[1-2][0-9]|3[0-2]))?$",
+            "Description": "Enter the value of the MGMT2 subnet - External VPC"
+        },
+        "EXTTGWAtt1Subnet": {
+            "Type": "String",
+            "Default": "192.168.61.0/24",
+            "AllowedPattern": "^(([0-9]|[1-9][0-9]|1[0-9][0-9]|2[0-4][0-9]|25[0-5])\\.){3}([0-9]|[1-9][0-9]|1[0-9][0-9]|2[0-4][0-9]|25[0-5]){1}(\\/([0-9]|[1-2][0-9]|3[0-2]))?$",
+            "Description": "Enter the value of the Private2 subnet"
+        },
+        "EXTTGWAtt2Subnet": {
+            "Type": "String",
+            "Default": "192.168.62.0/24",
+            "AllowedPattern": "^(([0-9]|[1-9][0-9]|1[0-9][0-9]|2[0-4][0-9]|25[0-5])\\.){3}([0-9]|[1-9][0-9]|1[0-9][0-9]|2[0-4][0-9]|25[0-5]){1}(\\/([0-9]|[1-2][0-9]|3[0-2]))?$",
+            "Description": "Enter the value of the Private2 subnet"
+        },
+        "EXTFortiGate1PublicIP": {
+            "Type": "String",
+            "Default": "192.168.1.5/24",
+            "Description": "Provide the IP address in CIDR form for the private interface of FortiGate1 (IP from PrivateSubnet1)",
+            "AllowedPattern": "^(([0-9]|[1-9][0-9]|1[0-9][0-9]|2[0-4][0-9]|25[0-5])\\.){3}([0-9]|[1-9][0-9]|1[0-9][0-9]|2[0-4][0-9]|25[0-5]){1}(\\/([0-9]|[1-2][0-9]|3[0-2]))?$",
+            "ConstraintDescription": "must be a valid CIDR block format."
+        },
+        "EXTFortiGate1PrivateIP": {
+            "Type": "String",
+            "Default": "192.168.3.5/24",
+            "Description": "Provide the IP address in CIDR form for the private interface of FortiGate1 (IP from PrivateSubnet1)",
+            "AllowedPattern": "^(([0-9]|[1-9][0-9]|1[0-9][0-9]|2[0-4][0-9]|25[0-5])\\.){3}([0-9]|[1-9][0-9]|1[0-9][0-9]|2[0-4][0-9]|25[0-5]){1}(\\/([0-9]|[1-2][0-9]|3[0-2]))?$",
+            "ConstraintDescription": "must be a valid CIDR block format."
+        },
+        "EXTFortiGate1HAsyncIP": {
+            "Type": "String",
+            "Default": "192.168.5.5/24",
+            "Description": "Provide the IP address in CIDR form for the ha sync interface of FortiGate1 (IP from HASyncSubnet1)",
+            "AllowedPattern": "^(([0-9]|[1-9][0-9]|1[0-9][0-9]|2[0-4][0-9]|25[0-5])\\.){3}([0-9]|[1-9][0-9]|1[0-9][0-9]|2[0-4][0-9]|25[0-5]){1}(\\/([0-9]|[1-2][0-9]|3[0-2]))?$",
+            "ConstraintDescription": "must be a valid CIDR block format."
+        },
+        "EXTFortiGate1HAmgmtIP": {
+            "Type": "String",
+            "Default": "192.168.7.5/24",
+            "Description": "Provide the IP address in CIDR form for the ha management interface of FortiGate1 (IP from HAMgmtSubnet1)",
+            "AllowedPattern": "^(([0-9]|[1-9][0-9]|1[0-9][0-9]|2[0-4][0-9]|25[0-5])\\.){3}([0-9]|[1-9][0-9]|1[0-9][0-9]|2[0-4][0-9]|25[0-5]){1}(\\/([0-9]|[1-2][0-9]|3[0-2]))?$",
+            "ConstraintDescription": "must be a valid CIDR block format."
+        },
+        "EXTFortiGate2PublicIP": {
+            "Type": "String",
+            "Default": "192.168.2.5/24",
+            "Description": "Provide the IP address in CIDR form for the public interface of FortiGate2 (IP from PublicSubnet2)",
+            "AllowedPattern": "^(([0-9]|[1-9][0-9]|1[0-9][0-9]|2[0-4][0-9]|25[0-5])\\.){3}([0-9]|[1-9][0-9]|1[0-9][0-9]|2[0-4][0-9]|25[0-5]){1}(\\/([0-9]|[1-2][0-9]|3[0-2]))?$",
+            "ConstraintDescription": "must be a valid CIDR block format."
+        },
+        "EXTFortiGate2PrivateIP": {
+            "Type": "String",
+            "Default": "192.168.4.5/24",
+            "Description": "Provide the IP address in CIDR form for the private interface of FortiGate2 (IP from PrivateSubnet2)",
+            "AllowedPattern": "^(([0-9]|[1-9][0-9]|1[0-9][0-9]|2[0-4][0-9]|25[0-5])\\.){3}([0-9]|[1-9][0-9]|1[0-9][0-9]|2[0-4][0-9]|25[0-5]){1}(\\/([0-9]|[1-2][0-9]|3[0-2]))?$",
+            "ConstraintDescription": "must be a valid CIDR block format."
+        },
+        "EXTFortiGate2HAsyncIP": {
+            "Type": "String",
+            "Default": "192.168.6.5/24",
+            "Description": "Provide the IP address in CIDR form for the ha sync interface of FortiGate2 (IP from HASyncSubnet2)",
+            "AllowedPattern": "^(([0-9]|[1-9][0-9]|1[0-9][0-9]|2[0-4][0-9]|25[0-5])\\.){3}([0-9]|[1-9][0-9]|1[0-9][0-9]|2[0-4][0-9]|25[0-5]){1}(\\/([0-9]|[1-2][0-9]|3[0-2]))?$",
+            "ConstraintDescription": "must be a valid CIDR block format."
+        },
+        "EXTFortiGate2HAmgmtIP": {
+            "Type": "String",
+            "Default": "192.168.8.5/24",
+            "Description": "Provide the IP address in CIDR form for the ha management interface of FortiGate2 (IP from HAMgmtSubnet2)",
+            "AllowedPattern": "^(([0-9]|[1-9][0-9]|1[0-9][0-9]|2[0-4][0-9]|25[0-5])\\.){3}([0-9]|[1-9][0-9]|1[0-9][0-9]|2[0-4][0-9]|25[0-5]){1}(\\/([0-9]|[1-2][0-9]|3[0-2]))?$",
+            "ConstraintDescription": "must be a valid CIDR block format."
+        },
+        "EXTInstanceType": {
+            "Type": "String",
+            "Default": "c5.xlarge",
+            "Description": "Select the instance type for the FortiGates",
+            "AllowedValues": [
+                "c5.xlarge",
+                "c5.2xlarge",
+                "c5.4xlarge",
+                "c5.9xlarge",
+                "c5.18xlarge",
+                "c5n.xlarge",
+                "c5n.2xlarge",
+                "c5n.4xlarge",
+                "c5n.9xlarge",
+                "c5n.18xlarge"
+            ]
+        },
+        "EXTFortiGate1ConfigFile": {
+            "Type": "String",
+            "Description": "Provide the name of the CONFIG file in the Init S3 Bucket for EXTERNAL FortiGate1 (ie fgt1ext.cfg)",
+            "Default": "fgt1ext.cfg"
+        },
+        "EXTFortiGate2ConfigFile": {
+            "Type": "String",
+            "Description": "Provide the name of the CONFIG file in the Init S3 Bucket for EXTERNAL FortiGate2 (ie fgt2ext.cfg)",
+            "Default": "fgt2ext.cfg"
+        },
+        "INTVpcCidr": {
+            "Type": "String",
+            "Default": "192.168.64.0/18",
+            "AllowedPattern": "^(([0-9]|[1-9][0-9]|1[0-9][0-9]|2[0-4][0-9]|25[0-5])\\.){3}([0-9]|[1-9][0-9]|1[0-9][0-9]|2[0-4][0-9]|25[0-5]){1}(\\/([0-9]|[1-2][0-9]|3[0-2]))?$",
+            "ConstraintDescription": "must be a valid CIDR block format.",
+            "Description": "The CIDR block for the External Security VPC."
+        },
+        "INTPublic1Subnet": {
+            "Type": "String",
+            "Default": "192.168.64.0/24",
+            "AllowedPattern": "^(([0-9]|[1-9][0-9]|1[0-9][0-9]|2[0-4][0-9]|25[0-5])\\.){3}([0-9]|[1-9][0-9]|1[0-9][0-9]|2[0-4][0-9]|25[0-5]){1}(\\/([0-9]|[1-2][0-9]|3[0-2]))?$",
+            "Description": "Enter the value of the Public1 subnet- External VPC"
+        },
+        "INTPublic2Subnet": {
+            "Type": "String",
+            "Default": "192.168.65.0/24",
+            "AllowedPattern": "^(([0-9]|[1-9][0-9]|1[0-9][0-9]|2[0-4][0-9]|25[0-5])\\.){3}([0-9]|[1-9][0-9]|1[0-9][0-9]|2[0-4][0-9]|25[0-5]){1}(\\/([0-9]|[1-2][0-9]|3[0-2]))?$",
+            "Description": "Enter the value of the Public2 subnet - External VPC"
+        },
+        "INTPrivate1Subnet": {
+            "Type": "String",
+            "Default": "192.168.66.0/24",
+            "AllowedPattern": "^(([0-9]|[1-9][0-9]|1[0-9][0-9]|2[0-4][0-9]|25[0-5])\\.){3}([0-9]|[1-9][0-9]|1[0-9][0-9]|2[0-4][0-9]|25[0-5]){1}(\\/([0-9]|[1-2][0-9]|3[0-2]))?$",
+            "Description": "Enter the value of the Private1 subnet - External VPC"
+        },
+        "INTPrivate2Subnet": {
+            "Type": "String",
+            "Default": "192.168.67.0/24",
+            "AllowedPattern": "^(([0-9]|[1-9][0-9]|1[0-9][0-9]|2[0-4][0-9]|25[0-5])\\.){3}([0-9]|[1-9][0-9]|1[0-9][0-9]|2[0-4][0-9]|25[0-5]){1}(\\/([0-9]|[1-2][0-9]|3[0-2]))?$",
+            "Description": "Enter the value of the Private2 subnet-External VPC"
+        },
+        "INTHA1Subnet": {
+            "Type": "String",
+            "Default": "192.168.68.0/24",
+            "AllowedPattern": "^(([0-9]|[1-9][0-9]|1[0-9][0-9]|2[0-4][0-9]|25[0-5])\\.){3}([0-9]|[1-9][0-9]|1[0-9][0-9]|2[0-4][0-9]|25[0-5]){1}(\\/([0-9]|[1-2][0-9]|3[0-2]))?$",
+            "Description": "Enter the value of the HA1 subnet - External VPC"
+        },
+        "INTHA2Subnet": {
+            "Type": "String",
+            "Default": "192.168.69.0/24",
+            "AllowedPattern": "^(([0-9]|[1-9][0-9]|1[0-9][0-9]|2[0-4][0-9]|25[0-5])\\.){3}([0-9]|[1-9][0-9]|1[0-9][0-9]|2[0-4][0-9]|25[0-5]){1}(\\/([0-9]|[1-2][0-9]|3[0-2]))?$",
+            "Description": "Enter the value of the HA2 subnet - External VPC"
+        },
+        "INTMGMT1Subnet": {
+            "Type": "String",
+            "Default": "192.168.70.0/24",
+            "AllowedPattern": "^(([0-9]|[1-9][0-9]|1[0-9][0-9]|2[0-4][0-9]|25[0-5])\\.){3}([0-9]|[1-9][0-9]|1[0-9][0-9]|2[0-4][0-9]|25[0-5]){1}(\\/([0-9]|[1-2][0-9]|3[0-2]))?$",
+            "Description": "Enter the value of the MGMT1 subnet - External VPC"
+        },
+        "INTMGMT2Subnet": {
+            "Type": "String",
+            "Default": "192.168.71.0/24",
+            "Description": "Enter the value of the MGMT2 subnet - External VPC"
+        },
+        "INTTGWAtt1Subnet": {
+            "Type": "String",
+            "Default": "192.168.125.0/24",
+            "AllowedPattern": "^(([0-9]|[1-9][0-9]|1[0-9][0-9]|2[0-4][0-9]|25[0-5])\\.){3}([0-9]|[1-9][0-9]|1[0-9][0-9]|2[0-4][0-9]|25[0-5]){1}(\\/([0-9]|[1-2][0-9]|3[0-2]))?$",
+            "Description": "Enter the value of the Private2 subnet"
+        },
+        "INTTGWAtt2Subnet": {
+            "Type": "String",
+            "Default": "192.168.126.0/24",
+            "AllowedPattern": "^(([0-9]|[1-9][0-9]|1[0-9][0-9]|2[0-4][0-9]|25[0-5])\\.){3}([0-9]|[1-9][0-9]|1[0-9][0-9]|2[0-4][0-9]|25[0-5]){1}(\\/([0-9]|[1-2][0-9]|3[0-2]))?$",
+            "Description": "Enter the value of the Private2 subnet"
+        },
+        "INTFortiGate1PublicIP": {
+            "Type": "String",
+            "Default": "192.168.64.5/24",
+            "Description": "Provide the IP address in CIDR form for the public interface of FortiGate1 (IP from PublicSubnet1)",
+            "AllowedPattern": "^(([0-9]|[1-9][0-9]|1[0-9][0-9]|2[0-4][0-9]|25[0-5])\\.){3}([0-9]|[1-9][0-9]|1[0-9][0-9]|2[0-4][0-9]|25[0-5]){1}(\\/([0-9]|[1-2][0-9]|3[0-2]))?$",
+            "ConstraintDescription": "must be a valid CIDR block format."
+        },
+        "INTFortiGate1PrivateIP": {
+            "Type": "String",
+            "Default": "192.168.66.5/24",
+            "Description": "Provide the IP address in CIDR form for the private interface of FortiGate1 (IP from PrivateSubnet1)",
+            "AllowedPattern": "^(([0-9]|[1-9][0-9]|1[0-9][0-9]|2[0-4][0-9]|25[0-5])\\.){3}([0-9]|[1-9][0-9]|1[0-9][0-9]|2[0-4][0-9]|25[0-5]){1}(\\/([0-9]|[1-2][0-9]|3[0-2]))?$",
+            "ConstraintDescription": "must be a valid CIDR block format."
+        },
+        "INTFortiGate1HAsyncIP": {
+            "Type": "String",
+            "Default": "192.168.68.5/24",
+            "Description": "Provide the IP address in CIDR form for the ha sync interface of FortiGate1 (IP from HASyncSubnet1)",
+            "AllowedPattern": "^(([0-9]|[1-9][0-9]|1[0-9][0-9]|2[0-4][0-9]|25[0-5])\\.){3}([0-9]|[1-9][0-9]|1[0-9][0-9]|2[0-4][0-9]|25[0-5]){1}(\\/([0-9]|[1-2][0-9]|3[0-2]))?$",
+            "ConstraintDescription": "must be a valid CIDR block format."
+        },
+        "INTFortiGate1HAmgmtIP": {
+            "Type": "String",
+            "Default": "192.168.70.5/24",
+            "Description": "Provide the IP address in CIDR form for the ha management interface of FortiGate1 (IP from HAMgmtSubnet1)",
+            "AllowedPattern": "^(([0-9]|[1-9][0-9]|1[0-9][0-9]|2[0-4][0-9]|25[0-5])\\.){3}([0-9]|[1-9][0-9]|1[0-9][0-9]|2[0-4][0-9]|25[0-5]){1}(\\/([0-9]|[1-2][0-9]|3[0-2]))?$",
+            "ConstraintDescription": "must be a valid CIDR block format."
+        },
+        "INTFortiGate2PublicIP": {
+            "Type": "String",
+            "Default": "192.168.65.5/24",
+            "Description": "Provide the IP address in CIDR form for the public interface of FortiGate2 (IP from PublicSubnet2)",
+            "AllowedPattern": "^(([0-9]|[1-9][0-9]|1[0-9][0-9]|2[0-4][0-9]|25[0-5])\\.){3}([0-9]|[1-9][0-9]|1[0-9][0-9]|2[0-4][0-9]|25[0-5]){1}(\\/([0-9]|[1-2][0-9]|3[0-2]))?$",
+            "ConstraintDescription": "must be a valid CIDR block format."
+        },
+        "INTFortiGate2PrivateIP": {
+            "Type": "String",
+            "Default": "192.168.67.5/24",
+            "Description": "Provide the IP address in CIDR form for the private interface of FortiGate2 (IP from PrivateSubnet2)",
+            "AllowedPattern": "^(([0-9]|[1-9][0-9]|1[0-9][0-9]|2[0-4][0-9]|25[0-5])\\.){3}([0-9]|[1-9][0-9]|1[0-9][0-9]|2[0-4][0-9]|25[0-5]){1}(\\/([0-9]|[1-2][0-9]|3[0-2]))?$",
+            "ConstraintDescription": "must be a valid CIDR block format."
+        },
+        "INTFortiGate2HAsyncIP": {
+            "Type": "String",
+            "Default": "192.168.69.5/24",
+            "Description": "Provide the IP address in CIDR form for the ha sync interface of FortiGate2 (IP from HASyncSubnet2)",
+            "AllowedPattern": "^(([0-9]|[1-9][0-9]|1[0-9][0-9]|2[0-4][0-9]|25[0-5])\\.){3}([0-9]|[1-9][0-9]|1[0-9][0-9]|2[0-4][0-9]|25[0-5]){1}(\\/([0-9]|[1-2][0-9]|3[0-2]))?$",
+            "ConstraintDescription": "must be a valid CIDR block format."
+        },
+        "INTFortiGate2HAmgmtIP": {
+            "Type": "String",
+            "Default": "192.168.71.5/24",
+            "Description": "Provide the IP address in CIDR form for the ha management interface of FortiGate2 (IP from HAMgmtSubnet2)",
+            "AllowedPattern": "^(([0-9]|[1-9][0-9]|1[0-9][0-9]|2[0-4][0-9]|25[0-5])\\.){3}([0-9]|[1-9][0-9]|1[0-9][0-9]|2[0-4][0-9]|25[0-5]){1}(\\/([0-9]|[1-2][0-9]|3[0-2]))?$",
+            "ConstraintDescription": "must be a valid CIDR block format."
+        },
+        "INTInstanceType": {
+            "Type": "String",
+            "Default": "c5.xlarge",
+            "Description": "Select the instance type for the FortiGates",
+            "AllowedValues": [
+                "c5.xlarge",
+                "c5.2xlarge",
+                "c5.4xlarge",
+                "c5.9xlarge",
+                "c5.18xlarge",
+                "c5n.xlarge",
+                "c5n.2xlarge",
+                "c5n.4xlarge",
+                "c5n.9xlarge",
+                "c5n.18xlarge"
+            ]
+        },
+        "INTFortiGate1ConfigFile": {
+            "Type": "String",
+            "Description": "Provide the name of the CONFIG file in the Init S3 Bucket for INTERNAL FortiGate1 (ie fgt1int.cfg)",
+            "Default": "fgt1int.cfg"
+        },
+        "INTFortiGate2ConfigFile": {
+            "Type": "String",
+            "Description": "Provide the name of the CONFIG file in the Init S3 Bucket for INTERNAL FortiGate2 (ie fgt2int.cfg)",
+            "Default": "fgt2int.cfg"
+        },
+        "TGWTunnelPSK": {
+            "Type": "String",
+            "Description": "Provide the Preshared Key for the tunnel with TGW",
+            "Default": "fortinettraining101"
+        },
+        "FortiGateAdminCidr": {
+            "Type": "String",
+            "AllowedPattern": "^(([0-9]|[1-9][0-9]|1[0-9][0-9]|2[0-4][0-9]|25[0-5])\\.){3}([0-9]|[1-9][0-9]|1[0-9][0-9]|2[0-4][0-9]|25[0-5]){1}(\\/([0-9]|[1-2][0-9]|3[0-2]))?$",
+            "ConstraintDescription": "must be a valid CIDR block format and 0.0.0.0/0 is highly not recommended.",
+            "Description": "CIDR block for external admin management access. **WARNING!** 0.0.0.0/0 accepts connections from any IP address. We recommend that you use a constrained CIDR range to reduce the potential of inbound attacks from unknown IP addresses.",
+            "Default": "0.0.0.0/0"
+        },
+        "BgpAsn": {
+            "Type": "Number",
+            "MinValue": 64514,
+            "Default": 64514,
+            "MaxValue": 65534,
+            "Description": "The Border Gateway Protocol (BGP) Autonomous System Number of the Transit Gateway."
+        },
+        "Spoke1VpcCidr": {
+            "Type": "String",
+            "Default": "10.64.0.0/16",
+            "AllowedPattern": "^(([0-9]|[1-9][0-9]|1[0-9][0-9]|2[0-4][0-9]|25[0-5])\\.){3}([0-9]|[1-9][0-9]|1[0-9][0-9]|2[0-4][0-9]|25[0-5]){1}(\\/([0-9]|[1-2][0-9]|3[0-2]))?$",
+            "ConstraintDescription": "must be a valid CIDR block format.",
+            "Description": "The CIDR block for the External Security VPC."
+        },
+        "Spoke1Private1Subnet": {
+            "Type": "String",
+            "Default": "10.64.1.0/24",
+            "AllowedPattern": "^(([0-9]|[1-9][0-9]|1[0-9][0-9]|2[0-4][0-9]|25[0-5])\\.){3}([0-9]|[1-9][0-9]|1[0-9][0-9]|2[0-4][0-9]|25[0-5]){1}(\\/([0-9]|[1-2][0-9]|3[0-2]))?$",
+            "Description": "Enter the value of the Public1 subnet- External VPC"
+        },
+        "Spoke1Private2Subnet": {
+            "Type": "String",
+            "Default": "10.64.2.0/24",
+            "AllowedPattern": "^(([0-9]|[1-9][0-9]|1[0-9][0-9]|2[0-4][0-9]|25[0-5])\\.){3}([0-9]|[1-9][0-9]|1[0-9][0-9]|2[0-4][0-9]|25[0-5]){1}(\\/([0-9]|[1-2][0-9]|3[0-2]))?$",
+            "Description": "Enter the value of the Public2 subnet - External VPC"
+        },
+        "Spoke2VpcCidr": {
+            "Type": "String",
+            "Default": "10.65.0.0/16",
+            "AllowedPattern": "^(([0-9]|[1-9][0-9]|1[0-9][0-9]|2[0-4][0-9]|25[0-5])\\.){3}([0-9]|[1-9][0-9]|1[0-9][0-9]|2[0-4][0-9]|25[0-5]){1}(\\/([0-9]|[1-2][0-9]|3[0-2]))?$",
+            "ConstraintDescription": "must be a valid CIDR block format.",
+            "Description": "The CIDR block for the External Security VPC."
+        },
+        "Spoke2Private1Subnet": {
+            "Type": "String",
+            "Default": "10.65.1.0/24",
+            "AllowedPattern": "^(([0-9]|[1-9][0-9]|1[0-9][0-9]|2[0-4][0-9]|25[0-5])\\.){3}([0-9]|[1-9][0-9]|1[0-9][0-9]|2[0-4][0-9]|25[0-5]){1}(\\/([0-9]|[1-2][0-9]|3[0-2]))?$",
+            "Description": "Enter the value of the Public1 subnet- External VPC"
+        },
+        "Spoke2Private2Subnet": {
+            "Type": "String",
+            "Default": "10.65.2.0/24",
+            "AllowedPattern": "^(([0-9]|[1-9][0-9]|1[0-9][0-9]|2[0-4][0-9]|25[0-5])\\.){3}([0-9]|[1-9][0-9]|1[0-9][0-9]|2[0-4][0-9]|25[0-5]){1}(\\/([0-9]|[1-2][0-9]|3[0-2]))?$",
+            "Description": "Enter the value of the Public2 subnet - External VPC"
+        }
+    },
+    "Conditions": {
+        "GovCloudCondition": {
+            "Fn::Equals": [
+                {
+                    "Ref": "AWS::Region"
+                },
+                "us-gov-west-1"
+            ]
+        }
+    },
+    "Mappings": {
+        "FortiGateKeyMap": {
+            "FortiGateVersion": {
+                "623": "FGTVM64PAYG623",
+                "642": "FGTVM64PAYG642",
+                "LATEST": "FGTVM64PAYG642"
+            }
+        },
+        "AWSAMIRegionMap": {
+            "AMI": {
+                "FGTVM64PAYG623": "aws-marketplace/FortiGate-VM64-AWSONDEMAND build8404 (6.2.3) GA-3124a694-441c-4ff1-8bf7-4d153be424a6-ami-0462507a813be3282.4",
+                "FGTVM64PAYG642": "aws-marketplace/FortiGate-VM64-AWSONDEMAND build1723 (6.4.2) GA-3124a694-441c-4ff1-8bf7-4d153be424a6-ami-072eddce6321e3dfc.4"
+            },
+            "ap-northeast-1": {
+                "FGTVM64PAYG623": "ami-0444162d604179bf6",
+                "FGTVM64PAYG642": "ami-012323c6ee2d10939"
+            },
+            "ap-northeast-2": {
+                "FGTVM64PAYG623": "ami-065b67d14c722617a",
+                "FGTVM64PAYG642": "ami-00d77eb74c66fb356"
+            },
+            "ap-south-1": {
+                "FGTVM64PAYG623": "ami-0f6693857523585b8",
+                "FGTVM64PAYG642": "ami-0cdc691025c98c34c"
+            },
+            "ap-southeast-1": {
+                "FGTVM64PAYG623": "ami-0155fb808596ae522",
+                "FGTVM64PAYG642": "ami-0796bf2adb764b2a9"
+            },
+            "ap-southeast-2": {
+                "FGTVM64PAYG623": "ami-0b67711c6be07aa0b",
+                "FGTVM64PAYG642": "ami-0080eebbc256a695c"
+            },
+            "ca-central-1": {
+                "FGTVM64PAYG623": "ami-099941e57393c2225",
+                "FGTVM64PAYG642": "ami-0af16a22b71764ca5"
+            },
+            "eu-central-1": {
+                "FGTVM64PAYG623": "ami-0c380ca68f2b1f6e8",
+                "FGTVM64PAYG642": "ami-04e0fd86abd8d2109"
+            },
+            "eu-north-1": {
+                "FGTVM64PAYG623": "ami-0d49417aa3a3912e1",
+                "FGTVM64PAYG642": "ami-03cb609d3790d97a0"
+            },
+            "eu-west-1": {
+                "FGTVM64PAYG623": "ami-0874d1d29263b27ff",
+                "FGTVM64PAYG642": "ami-04d2af58b72ff5293"
+            },
+            "eu-west-2": {
+                "FGTVM64PAYG623": "ami-04eba63bb19dbeebe",
+                "FGTVM64PAYG642": "ami-0f8e0a1e8a4239f07"
+            },
+            "eu-west-3": {
+                "FGTVM64PAYG623": "ami-0c104a0848b644152",
+                "FGTVM64PAYG642": "ami-0657dfa166eab43f3"
+            },
+            "sa-east-1": {
+                "FGTVM64PAYG623": "ami-04de901f24e8532db",
+                "FGTVM64PAYG642": "ami-0bc801f13e61a333d"
+            },
+            "us-east-1": {
+                "FGTVM64PAYG623": "ami-027f258cda3df62de",
+                "FGTVM64PAYG642": "ami-0164e2a945bf351e1"
+            },
+            "us-east-2": {
+                "FGTVM64PAYG623": "ami-05a4ac8312f7911b9",
+                "FGTVM64PAYG642": "ami-0c2f03fff3cc0cc92"
+            },
+            "us-gov-east-1": {
+                "FGTVM64PAYG623": "ami-9bef03ea",
+                "FGTVM64PAYG642": ""
+            },
+            "us-gov-west-1": {
+                "FGTVM64PAYG623": "ami-c4d9efa5",
+                "FGTVM64PAYG642": ""
+            },
+            "us-west-1": {
+                "FGTVM64PAYG623": "ami-0f54d37e47fa994a0",
+                "FGTVM64PAYG642": "ami-039efced40216d10f"
+            },
+            "us-west-2": {
+                "FGTVM64PAYG623": "ami-02b9cc036cab1071d",
+                "FGTVM64PAYG642": "ami-03ee081dace39500a"
+            },
+            "ap-east-1": {
+                "FGTVM64PAYG623": "ami-0437be57fc361c67b",
+                "FGTVM64PAYG642": "ami-09722e9bb4cc35027"
+            },
+            "me-south-1": {
+                "FGTVM64PAYG623": "ami-0fcd028d7d86a0695",
+                "FGTVM64PAYG642": "ami-0bef354a4f9e6ab7e"
+            }
+        },
+        "ProtocolPortMap": {
+            "HTTP": {
+                "defaultport": "80"
+            },
+            "HTTPS": {
+                "defaultport": "443"
+            },
+            "TCP": {
+                "defaultport": "443"
+            }
+        }
+    },
+    "Resources": {
+        "TransitGatewayid": {
+            "Type": "AWS::EC2::TransitGateway",
+            "Properties": {
+                "DefaultRouteTablePropagation": "disable",
+                "DefaultRouteTableAssociation": "disable",
+                "Description": "string",
+                "AutoAcceptSharedAttachments": "disable",
+                "VpnEcmpSupport": "enable",
+                "DnsSupport": "enable",
+                "MulticastSupport": "enable",
+                "AmazonSideAsn": {
+                    "Ref": "BgpAsn"
+                },
+                "Tags": [
+                    {
+                        "Key": "Name",
+                        "Value": {
+                            "Fn::Join": [
+                                "-",
+                                [
+                                    {
+                                        "Ref": "ResourceTagPrefix"
+                                    },
+                                    "transit-gateway"
+                                ]
+                            ]
+                        }
+                    },
+                    {
+                        "Key": "ResourceGroup",
+                        "Value": {
+                            "Ref": "ResourceTagPrefix"
+                        }
+                    }
+                ]
+            }
+        },
+        "TransitGatewayRouteTableHubid": {
+            "Type": "AWS::EC2::TransitGatewayRouteTable",
+            "Properties": {
+                "TransitGatewayId": {
+                    "Ref": "TransitGatewayid"
+                },
+                "Tags": [
+                    {
+                        "Key": "Name",
+                        "Value": {
+                            "Fn::Join": [
+                                "-",
+                                [
+                                    {
+                                        "Ref": "ResourceTagPrefix"
+                                    },
+                                    "TGW-Hub-RTB"
+                                ]
+                            ]
+                        }
+                    }
+                ]
+            }
+        },
+        "TransitGatewayRouteTableSpokeid": {
+            "Type": "AWS::EC2::TransitGatewayRouteTable",
+            "Properties": {
+                "TransitGatewayId": {
+                    "Ref": "TransitGatewayid"
+                },
+                "Tags": [
+                    {
+                        "Key": "Name",
+                        "Value": {
+                            "Fn::Join": [
+                                "-",
+                                [
+                                    {
+                                        "Ref": "ResourceTagPrefix"
+                                    },
+                                    "TGW-Spoke-RTB"
+                                ]
+                            ]
+                        }
+                    }
+                ]
+            }
+        },
+        "StackCreateInternalVPC": {
+            "Type": "AWS::CloudFormation::Stack",
+            "Properties": {
+                "Parameters": {
+                    "ResourceTAG": {
+                        "Ref": "ResourceTagPrefix"
+                    },
+                    "ResourceTagname": "Internal",
+                    "HubVPCCIDR": {
+                        "Ref": "INTVpcCidr"
+                    },
+                    "HubAZForSubnet1": {
+                        "Ref": "AZ1"
+                    },
+                    "HubAZForSubnet2": {
+                        "Ref": "AZ2"
+                    },
+                    "HubPublic1Subnet": {
+                        "Ref": "INTPublic1Subnet"
+                    },
+                    "HubPublic2Subnet": {
+                        "Ref": "INTPublic2Subnet"
+                    },
+                    "HubPrivate1Subnet": {
+                        "Ref": "INTPrivate1Subnet"
+                    },
+                    "HubPrivate2Subnet": {
+                        "Ref": "INTPrivate2Subnet"
+                    },
+                    "Hubha1Subnet": {
+                        "Ref": "INTHA1Subnet"
+                    },
+                    "Hubha2Subnet": {
+                        "Ref": "INTHA2Subnet"
+                    },
+                    "HubMgmt1Subnet": {
+                        "Ref": "INTMGMT1Subnet"
+                    },
+                    "HubMgmt2Subnet": {
+                        "Ref": "INTMGMT2Subnet"
+                    },
+                    "HubTGWAttSubnet1": {
+                        "Ref": "INTTGWAtt1Subnet"
+                    },
+                    "HubTGWAttSubnet2": {
+                        "Ref": "INTTGWAtt2Subnet"
+                    },
+                    "TransitGateway": {
+                        "Ref": "TransitGatewayid"
+                    },
+                    "TransitGatewayRouteTableid": {
+                        "Ref": "TransitGatewayRouteTableHubid"
+                    }
+                },
+                "TemplateURL": {
+                    "Fn::Sub": [
+                        "https://${S3BucketName}.${S3Region}.amazonaws.com/create-hubvpc.template",
+                        {
+                            "S3Region": {
+                                "Fn::If": [
+                                    "GovCloudCondition",
+                                    "s3-us-gov-west-1",
+                                    "s3"
+                                ]
+                            },
+                            "S3BucketName": {
+                                "Ref": "S3BucketName"
+                            }
+                        }
+                    ]
+                },
+                "TimeoutInMinutes": "5"
+            }
+        },
+        "StackCreateExternalVPC": {
+            "Type": "AWS::CloudFormation::Stack",
+            "Properties": {
+                "Parameters": {
+                    "ResourceTAG": {
+                        "Ref": "ResourceTagPrefix"
+                    },
+                    "ResourceTagname": "External",
+                    "HubVPCCIDR": {
+                        "Ref": "EXTVpcCidr"
+                    },
+                    "HubAZForSubnet1": {
+                        "Ref": "AZ1"
+                    },
+                    "HubAZForSubnet2": {
+                        "Ref": "AZ2"
+                    },
+                    "HubPublic1Subnet": {
+                        "Ref": "EXTPublic1Subnet"
+                    },
+                    "HubPublic2Subnet": {
+                        "Ref": "EXTPublic2Subnet"
+                    },
+                    "HubPrivate1Subnet": {
+                        "Ref": "EXTPrivate1Subnet"
+                    },
+                    "HubPrivate2Subnet": {
+                        "Ref": "EXTPrivate2Subnet"
+                    },
+                    "Hubha1Subnet": {
+                        "Ref": "EXTHA1Subnet"
+                    },
+                    "Hubha2Subnet": {
+                        "Ref": "EXTHA2Subnet"
+                    },
+                    "HubMgmt1Subnet": {
+                        "Ref": "EXTMGMT1Subnet"
+                    },
+                    "HubMgmt2Subnet": {
+                        "Ref": "EXTMGMT2Subnet"
+                    },
+                    "HubTGWAttSubnet1": {
+                        "Ref": "EXTTGWAtt1Subnet"
+                    },
+                    "HubTGWAttSubnet2": {
+                        "Ref": "EXTTGWAtt2Subnet"
+                    },
+                    "TransitGateway": {
+                        "Ref": "TransitGatewayid"
+                    },
+                    "TransitGatewayRouteTableid": {
+                        "Ref": "TransitGatewayRouteTableHubid"
+                    }
+                },
+                "TemplateURL": {
+                    "Fn::Sub": [
+                        "https://${S3BucketName}.${S3Region}.amazonaws.com/create-hubvpc.template",
+                        {
+                            "S3Region": {
+                                "Fn::If": [
+                                    "GovCloudCondition",
+                                    "s3-us-gov-west-1",
+                                    "s3"
+                                ]
+                            },
+                            "S3BucketName": {
+                                "Ref": "S3BucketName"
+                            }
+                        }
+                    ]
+                },
+                "TimeoutInMinutes": "5"
+            }
+        },
+        "StackCreateSpoke1VPC": {
+            "Type": "AWS::CloudFormation::Stack",
+            "Properties": {
+                "Parameters": {
+                    "ResourceTAG": {
+                        "Ref": "ResourceTagPrefix"
+                    },
+                    "ResourceTagname": "Spoke1",
+                    "SpokeVPCCIDR": {
+                        "Ref": "Spoke1VpcCidr"
+                    },
+                    "SpokeAZForSubnet1": {
+                        "Ref": "AZ1"
+                    },
+                    "SpokeAZForSubnet2": {
+                        "Ref": "AZ2"
+                    },
+                    "SpokePrivate1Subnet": {
+                        "Ref": "Spoke1Private1Subnet"
+                    },
+                    "SpokePrivate2Subnet": {
+                        "Ref": "Spoke1Private2Subnet"
+                    },
+                    "TransitGateway": {
+                        "Ref": "TransitGatewayid"
+                    },
+                    "TransitGatewayRouteTableid": {
+                        "Ref": "TransitGatewayRouteTableSpokeid"
+                    }
+                },
+                "TemplateURL": {
+                    "Fn::Sub": [
+                        "https://${S3BucketName}.${S3Region}.amazonaws.com/create-spokevpc.template",
+                        {
+                            "S3Region": {
+                                "Fn::If": [
+                                    "GovCloudCondition",
+                                    "s3-us-gov-west-1",
+                                    "s3"
+                                ]
+                            },
+                            "S3BucketName": {
+                                "Ref": "S3BucketName"
+                            }
+                        }
+                    ]
+                },
+                "TimeoutInMinutes": "5"
+            }
+        },
+        "StackCreateSpoke2VPC": {
+            "Type": "AWS::CloudFormation::Stack",
+            "Properties": {
+                "Parameters": {
+                    "ResourceTAG": {
+                        "Ref": "ResourceTagPrefix"
+                    },
+                    "ResourceTagname": "Spoke2",
+                    "SpokeVPCCIDR": {
+                        "Ref": "Spoke2VpcCidr"
+                    },
+                    "SpokeAZForSubnet1": {
+                        "Ref": "AZ1"
+                    },
+                    "SpokeAZForSubnet2": {
+                        "Ref": "AZ2"
+                    },
+                    "SpokePrivate1Subnet": {
+                        "Ref": "Spoke2Private1Subnet"
+                    },
+                    "SpokePrivate2Subnet": {
+                        "Ref": "Spoke2Private2Subnet"
+                    },
+                    "TransitGateway": {
+                        "Ref": "TransitGatewayid"
+                    },
+                    "TransitGatewayRouteTableid": {
+                        "Ref": "TransitGatewayRouteTableSpokeid"
+                    }
+                },
+                "TemplateURL": {
+                    "Fn::Sub": [
+                        "https://${S3BucketName}.${S3Region}.amazonaws.com/create-spokevpc.template",
+                        {
+                            "S3Region": {
+                                "Fn::If": [
+                                    "GovCloudCondition",
+                                    "s3-us-gov-west-1",
+                                    "s3"
+                                ]
+                            },
+                            "S3BucketName": {
+                                "Ref": "S3BucketName"
+                            }
+                        }
+                    ]
+                },
+                "TimeoutInMinutes": "5"
+            }
+        },
+        "InstanceRole": {
+            "Type": "AWS::IAM::Role",
+            "Properties": {
+                "AssumeRolePolicyDocument": {
+                    "Version": "2012-10-17",
+                    "Statement": [
+                        {
+                            "Effect": "Allow",
+                            "Principal": {
+                                "Service": [
+                                    "ec2.amazonaws.com"
+                                ]
+                            },
+                            "Action": [
+                                "sts:AssumeRole"
+                            ]
+                        }
+                    ]
+                },
+                "Path": "/",
+                "Policies": [
+                    {
+                        "PolicyName": {
+                            "Fn::Join": [
+                                "-",
+                                [
+                                    {
+                                        "Ref": "ResourceTagPrefix"
+                                    },
+                                    "FGT-HA-IAM-Policy"
+                                ]
+                            ]
+                        },
+                        "PolicyDocument": {
+                            "Version": "2012-10-17",
+                            "Statement": [
+                                {
+                                    "Effect": "Allow",
+                                    "Action": [
+                                        "ec2:ReplaceRoute",
+                                        "ec2:AssignPrivateIpAddresses",
+                                        "ec2:UnassignPrivateIpAddresses",
+                                        "ec2:AssociateAddress"
+                                    ],
+                                    "Resource": "*"
+                                }
+                            ]
+                        }
+                    },
+                    {
+                        "PolicyName": {
+                            "Fn::Join": [
+                                "-",
+                                [
+                                    {
+                                        "Ref": "ResourceTagPrefix"
+                                    },
+                                    "ReadOnly"
+                                ]
+                            ]
+                        },
+                        "PolicyDocument": {
+                            "Version": "2012-10-17",
+                            "Statement": [
+                                {
+                                    "Effect": "Allow",
+                                    "Action": [
+                                        "ec2:Describe*",
+                                        "ec2:Get*"
+                                    ],
+                                    "Resource": "*"
+                                }
+                            ]
+                        }
+                    },
+                    {
+                        "PolicyName": {
+                            "Fn::Join": [
+                                "-",
+                                [
+                                    {
+                                        "Ref": "ResourceTagPrefix"
+                                    },
+                                    "S3-Policy"
+                                ]
+                            ]
+                        },
+                        "PolicyDocument": {
+                            "Version": "2012-10-17",
+                            "Statement": [
+                                {
+                                    "Effect": "Allow",
+                                    "Action": [
+                                        "s3:List*",
+                                        "s3:Get*"
+                                    ],
+                                    "Resource": "*"
+                                }
+                            ]
+                        }
+                    }
+                ]
+            }
+        },
+        "InstanceProfile": {
+            "Type": "AWS::IAM::InstanceProfile",
+            "Properties": {
+                "InstanceProfileName": {
+                    "Fn::Join": [
+                        "-",
+                        [
+                            {
+                                "Ref": "ResourceTagPrefix"
+                            },
+                            "FGT-InstanceIAMRole"
+                        ]
+                    ]
+                },
+                "Path": "/",
+                "Roles": [
+                    {
+                        "Ref": "InstanceRole"
+                    }
+                ]
+            }
+        },
+        "StackCreateInternalCluster": {
+            "Type": "AWS::CloudFormation::Stack",
+            "Properties": {
+                "Parameters": {
+                    "ResourceTAG": {
+                        "Ref": "ResourceTagPrefix"
+                    },
+                    "ResourceTagname": "Internal",
+                    "VPCID": {
+                        "Fn::GetAtt": [
+                            "StackCreateInternalVPC",
+                            "Outputs.HubVPCID"
+                        ]
+                    },
+                    "VPCCIDR": {
+                        "Ref": "INTVpcCidr"
+                    },
+                    "PublicSubnet1": {
+                        "Fn::GetAtt": [
+                            "StackCreateInternalVPC",
+                            "Outputs.HubPublic1SubnetID"
+                        ]
+                    },
+                    "PrivateSubnet1": {
+                        "Fn::GetAtt": [
+                            "StackCreateInternalVPC",
+                            "Outputs.HubPrivate1SubnetID"
+                        ]
+                    },
+                    "HASyncSubnet1": {
+                        "Fn::GetAtt": [
+                            "StackCreateInternalVPC",
+                            "Outputs.HubHA1SubnetID"
+                        ]
+                    },
+                    "HAMgmtSubnet1": {
+                        "Fn::GetAtt": [
+                            "StackCreateInternalVPC",
+                            "Outputs.HubMGMT1SubnetID"
+                        ]
+                    },
+                    "PublicSubnet2": {
+                        "Fn::GetAtt": [
+                            "StackCreateInternalVPC",
+                            "Outputs.HubPublic2SubnetID"
+                        ]
+                    },
+                    "PrivateSubnet2": {
+                        "Fn::GetAtt": [
+                            "StackCreateInternalVPC",
+                            "Outputs.HubPrivate2SubnetID"
+                        ]
+                    },
+                    "HASyncSubnet2": {
+                        "Fn::GetAtt": [
+                            "StackCreateInternalVPC",
+                            "Outputs.HubHA2SubnetID"
+                        ]
+                    },
+                    "HAMgmtSubnet2": {
+                        "Fn::GetAtt": [
+                            "StackCreateInternalVPC",
+                            "Outputs.HubMGMT2SubnetID"
+                        ]
+                    },
+                    "FortiGate1PublicIP": {
+                        "Ref": "INTFortiGate1PublicIP"
+                    },
+                    "FortiGate1PrivateIP": {
+                        "Ref": "INTFortiGate1PrivateIP"
+                    },
+                    "FortiGate1HAsyncIP": {
+                        "Ref": "INTFortiGate1HAsyncIP"
+                    },
+                    "FortiGate1HAmgmtIP": {
+                        "Ref": "INTFortiGate1HAmgmtIP"
+                    },
+                    "FortiGate2PublicIP": {
+                        "Ref": "INTFortiGate2PublicIP"
+                    },
+                    "FortiGate2PrivateIP": {
+                        "Ref": "INTFortiGate2PrivateIP"
+                    },
+                    "FortiGate2HAsyncIP": {
+                        "Ref": "INTFortiGate2HAsyncIP"
+                    },
+                    "FortiGate2HAmgmtIP": {
+                        "Ref": "INTFortiGate2HAmgmtIP"
+                    },
+                    "InstanceType": {
+                        "Ref": "INTInstanceType"
+                    },
+                    "InstanceProfile": {
+                        "Ref": "InstanceProfile"
+                    },
+                    "InstanceAMI": {
+                        "Fn::FindInMap": [
+                            "AWSAMIRegionMap",
+                            {
+                                "Ref": "AWS::Region"
+                            },
+                            {
+                                "Fn::FindInMap": [
+                                    "FortiGateKeyMap",
+                                    "FortiGateVersion",
+                                    {
+                                        "Ref": "FortiOSVersion"
+                                    }
+                                ]
+                            }
+                        ]
+                    },
+                    "InitS3Bucket": {
+                        "Ref": "S3BucketName"
+                    },
+                    "InitS3BucketRegion": {
+                        "Ref": "S3BucketRegion"
+                    },
+                    "CIDRForInstanceAccess": {
+                        "Ref": "FortiGateAdminCidr"
+                    },
+                    "KeyPair": {
+                        "Ref": "KeyPairName"
+                    },
+                    "AZForFGT1": {
+                        "Ref": "AZ1"
+                    },
+                    "AZForFGT2": {
+                        "Ref": "AZ2"
+                    },
+                    "PublicSubnetRouteTableID": {
+                        "Fn::GetAtt": [
+                            "StackCreateInternalVPC",
+                            "Outputs.HubPublicRouteTableID"
+                        ]
+                    },
+                    "FortiGate1ConfigFile": {
+                        "Ref": "INTFortiGate1ConfigFile"
+                    },
+                    "FortiGate2ConfigFile": {
+                        "Ref": "INTFortiGate2ConfigFile"
+                    }
+                },
+                "TemplateURL": {
+                    "Fn::Sub": [
+                        "https://${S3BucketName}.${S3Region}.amazonaws.com/fgt-ap-maz.template",
+                        {
+                            "S3Region": {
+                                "Fn::If": [
+                                    "GovCloudCondition",
+                                    "s3-us-gov-west-1",
+                                    "s3"
+                                ]
+                            },
+                            "S3BucketName": {
+                                "Ref": "S3BucketName"
+                            }
+                        }
+                    ]
+                },
+                "TimeoutInMinutes": "5"
+            }
+        },
+        "StackCreateExternalCluster": {
+            "Type": "AWS::CloudFormation::Stack",
+            "Properties": {
+                "Parameters": {
+                    "ResourceTAG": {
+                        "Ref": "ResourceTagPrefix"
+                    },
+                    "ResourceTagname": "External",
+                    "VPCID": {
+                        "Fn::GetAtt": [
+                            "StackCreateExternalVPC",
+                            "Outputs.HubVPCID"
+                        ]
+                    },
+                    "VPCCIDR": {
+                        "Ref": "EXTVpcCidr"
+                    },
+                    "PublicSubnet1": {
+                        "Fn::GetAtt": [
+                            "StackCreateExternalVPC",
+                            "Outputs.HubPublic1SubnetID"
+                        ]
+                    },
+                    "PrivateSubnet1": {
+                        "Fn::GetAtt": [
+                            "StackCreateExternalVPC",
+                            "Outputs.HubPrivate1SubnetID"
+                        ]
+                    },
+                    "HASyncSubnet1": {
+                        "Fn::GetAtt": [
+                            "StackCreateExternalVPC",
+                            "Outputs.HubHA1SubnetID"
+                        ]
+                    },
+                    "HAMgmtSubnet1": {
+                        "Fn::GetAtt": [
+                            "StackCreateExternalVPC",
+                            "Outputs.HubMGMT1SubnetID"
+                        ]
+                    },
+                    "PublicSubnet2": {
+                        "Fn::GetAtt": [
+                            "StackCreateExternalVPC",
+                            "Outputs.HubPublic2SubnetID"
+                        ]
+                    },
+                    "PrivateSubnet2": {
+                        "Fn::GetAtt": [
+                            "StackCreateExternalVPC",
+                            "Outputs.HubPrivate2SubnetID"
+                        ]
+                    },
+                    "HASyncSubnet2": {
+                        "Fn::GetAtt": [
+                            "StackCreateExternalVPC",
+                            "Outputs.HubHA2SubnetID"
+                        ]
+                    },
+                    "HAMgmtSubnet2": {
+                        "Fn::GetAtt": [
+                            "StackCreateExternalVPC",
+                            "Outputs.HubMGMT2SubnetID"
+                        ]
+                    },
+                    "FortiGate1PublicIP": {
+                        "Ref": "EXTFortiGate1PublicIP"
+                    },
+                    "FortiGate1PrivateIP": {
+                        "Ref": "EXTFortiGate1PrivateIP"
+                    },
+                    "FortiGate1HAsyncIP": {
+                        "Ref": "EXTFortiGate1HAsyncIP"
+                    },
+                    "FortiGate1HAmgmtIP": {
+                        "Ref": "EXTFortiGate1HAmgmtIP"
+                    },
+                    "FortiGate2PublicIP": {
+                        "Ref": "EXTFortiGate2PublicIP"
+                    },
+                    "FortiGate2PrivateIP": {
+                        "Ref": "EXTFortiGate2PrivateIP"
+                    },
+                    "FortiGate2HAsyncIP": {
+                        "Ref": "EXTFortiGate2HAsyncIP"
+                    },
+                    "FortiGate2HAmgmtIP": {
+                        "Ref": "EXTFortiGate2HAmgmtIP"
+                    },
+                    "InstanceType": {
+                        "Ref": "EXTInstanceType"
+                    },
+                    "InstanceProfile": {
+                        "Ref": "InstanceProfile"
+                    },
+                    "InstanceAMI": {
+                        "Fn::FindInMap": [
+                            "AWSAMIRegionMap",
+                            {
+                                "Ref": "AWS::Region"
+                            },
+                            {
+                                "Fn::FindInMap": [
+                                    "FortiGateKeyMap",
+                                    "FortiGateVersion",
+                                    {
+                                        "Ref": "FortiOSVersion"
+                                    }
+                                ]
+                            }
+                        ]
+                    },
+                    "InitS3Bucket": {
+                        "Ref": "S3BucketName"
+                    },
+                    "InitS3BucketRegion": {
+                        "Ref": "S3BucketRegion"
+                    },
+                    "CIDRForInstanceAccess": {
+                        "Ref": "FortiGateAdminCidr"
+                    },
+                    "KeyPair": {
+                        "Ref": "KeyPairName"
+                    },
+                    "AZForFGT1": {
+                        "Ref": "AZ1"
+                    },
+                    "AZForFGT2": {
+                        "Ref": "AZ2"
+                    },
+                    "PublicSubnetRouteTableID": {
+                        "Fn::GetAtt": [
+                            "StackCreateExternalVPC",
+                            "Outputs.HubPublicRouteTableID"
+                        ]
+                    },
+                    "FortiGate1ConfigFile": {
+                        "Ref": "EXTFortiGate1ConfigFile"
+                    },
+                    "FortiGate2ConfigFile": {
+                        "Ref": "EXTFortiGate2ConfigFile"
+                    }
+                },
+                "TemplateURL": {
+                    "Fn::Sub": [
+                        "https://${S3BucketName}.${S3Region}.amazonaws.com/fgt-ap-maz.template",
+                        {
+                            "S3Region": {
+                                "Fn::If": [
+                                    "GovCloudCondition",
+                                    "s3-us-gov-west-1",
+                                    "s3"
+                                ]
+                            },
+                            "S3BucketName": {
+                                "Ref": "S3BucketName"
+                            }
+                        }
+                    ]
+                },
+                "TimeoutInMinutes": "5"
+            }
+        },
+        "Spoke1toHubRouteTablePropagation": {
+            "Type": "AWS::EC2::TransitGatewayRouteTablePropagation",
+            "Properties": {
+                "TransitGatewayRouteTableId": {
+                    "Ref": "TransitGatewayRouteTableHubid"
+                },
+                "TransitGatewayAttachmentId": {
+                    "Fn::GetAtt": [
+                        "StackCreateSpoke1VPC",
+                        "Outputs.SpokeVPCAtt"
+                    ]
+                }
+            }
+        },
+        "Spoke2toHubRouteTablePropagation": {
+            "Type": "AWS::EC2::TransitGatewayRouteTablePropagation",
+            "Properties": {
+                "TransitGatewayRouteTableId": {
+                    "Ref": "TransitGatewayRouteTableHubid"
+                },
+                "TransitGatewayAttachmentId": {
+                    "Fn::GetAtt": [
+                        "StackCreateSpoke2VPC",
+                        "Outputs.SpokeVPCAtt"
+                    ]
+                }
+            }
+        },
+        "Hub1toSpokeRouteTablePropagation": {
+            "Type": "AWS::EC2::TransitGatewayRouteTablePropagation",
+            "Properties": {
+                "TransitGatewayRouteTableId": {
+                    "Ref": "TransitGatewayRouteTableSpokeid"
+                },
+                "TransitGatewayAttachmentId": {
+                    "Fn::GetAtt": [
+                        "StackCreateExternalVPC",
+                        "Outputs.HubVPCAttID"
+                    ]
+                }
+            }
+        },
+        "Hub2toSpokeRouteTablePropagation": {
+            "Type": "AWS::EC2::TransitGatewayRouteTablePropagation",
+            "Properties": {
+                "TransitGatewayRouteTableId": {
+                    "Ref": "TransitGatewayRouteTableSpokeid"
+                },
+                "TransitGatewayAttachmentId": {
+                    "Fn::GetAtt": [
+                        "StackCreateInternalVPC",
+                        "Outputs.HubVPCAttID"
+                    ]
+                }
+            }
+        },
+        "FGTCLInternalCustomerGateway": {
+            "Type": "AWS::EC2::CustomerGateway",
+            "Properties": {
+                "BgpAsn": "64512",
+                "IpAddress": {
+                    "Fn::GetAtt": [
+                        "StackCreateInternalCluster",
+                        "Outputs.ElasticIP"
+                    ]
+                },
+                "Tags": [
+                    {
+                        "Key": "Name",
+                        "Value": {
+                            "Fn::Join": [
+                                "-",
+                                [
+                                    {
+                                        "Ref": "ResourceTagPrefix"
+                                    },
+                                    "CL-FGT-Internal"
+                                ]
+                            ]
+                        }
+                    }
+                ],
+                "Type": "ipsec.1"
+            }
+        },
+        "VPNAttchtoTGW": {
+            "Type": "AWS::EC2::VPNConnection",
+            "Properties": {
+                "CustomerGatewayId": {
+                    "Ref": "FGTCLInternalCustomerGateway"
+                },
+                "StaticRoutesOnly": false,
+                "Tags": [
+                    {
+                        "Key": "Name",
+                        "Value": {
+                            "Fn::Join": [
+                                "-",
+                                [
+                                    {
+                                        "Ref": "ResourceTagPrefix"
+                                    },
+                                    "Internal-VPN-TGW-Attach"
+                                ]
+                            ]
+                        }
+                    }
+                ],
+                "TransitGatewayId": {
+                    "Ref": "TransitGatewayid"
+                },
+                "Type": "ipsec.1",
+                "VpnTunnelOptionsSpecifications": [
+                    {
+                        "PreSharedKey": {
+                            "Ref": "TGWTunnelPSK"
+                        },
+                        "TunnelInsideCidr": "169.254.64.0/30"
+                    },
+                    {
+                        "PreSharedKey": {
+                            "Ref": "TGWTunnelPSK"
+                        },
+                        "TunnelInsideCidr": "169.254.65.0/30"
+                    }
+                ]
+            }
+        }
+    },
+    "Metadata": {
+        "AWS::CloudFormation::Interface": {
+            "ParameterGroups": [
+                {
+                    "Label": {
+                        "default": "Resource tagging and S3 Bucket"
+                    },
+                    "Parameters": [
+                        "ResourceTagPrefix",
+                        "S3BucketName"
+                    ]
+                },
+                {
+                    "Label": {
+                        "default": "Global Network configuration"
+                    },
+                    "Parameters": [
+                        "AZ1",
+                        "AZ2",
+                        "BgpAsn"
+                    ]
+                },
+                {
+                    "Label": {
+                        "default": "Internal VPC configuration"
+                    },
+                    "Parameters": [
+                        "INTVpcCidr",
+                        "INTPublic1Subnet",
+                        "INTPublic2Subnet",
+                        "INTPrivate1Subnet",
+                        "INTPrivate2Subnet",
+                        "INTHA1Subnet",
+                        "INTHA2Subnet",
+                        "INTMGMT1Subnet",
+                        "INTMGMT2Subnet",
+                        "INTTGWAtt1Subnet",
+                        "INTTGWAtt2Subnet",
+                        "INTFortiGate1LicenseFile",
+                        "INTFortiGate2LicenseFile"
+                    ]
+                },
+                {
+                    "Label": {
+                        "default": "External VPC configuration"
+                    },
+                    "Parameters": [
+                        "EXTVpcCidr",
+                        "EXTPublic1Subnet",
+                        "EXTPublic2Subnet",
+                        "EXTPrivate1Subnet",
+                        "EXTPrivate2Subnet",
+                        "EXTHA1Subnet",
+                        "EXTHA2Subnet",
+                        "EXTMGMT1Subnet",
+                        "EXTMGMT2Subnet",
+                        "EXTTGWAtt1Subnet",
+                        "EXTTGWAtt2Subnet"
+                    ]
+                },
+                {
+                    "Label": {
+                        "default": "Internal FGT Cluster configuration"
+                    },
+                    "Parameters": [
+                        "INTFortiGate1PublicIP",
+                        "INTFortiGate1PrivateIP",
+                        "INTFortiGate1HAsyncIP",
+                        "INTFortiGate1HAmgmtIP",
+                        "INTFortiGate2PublicIP",
+                        "INTFortiGate2PrivateIP",
+                        "INTFortiGate2HAsyncIP",
+                        "INTFortiGate2HAmgmtIP",
+                        "INTInstanceType",
+                        "INTFortiGate1ConfigFile",
+                        "INTFortiGate2ConfigFile"
+                    ]
+                },
+                {
+                    "Label": {
+                        "default": "External FGT Cluster configuration"
+                    },
+                    "Parameters": [
+                        "EXTFortiGate1PublicIP",
+                        "EXTFortiGate1PrivateIP",
+                        "EXTFortiGate1HAsyncIP",
+                        "EXTFortiGate1HAmgmtIP",
+                        "EXTFortiGate2PublicIP",
+                        "EXTFortiGate2PrivateIP",
+                        "EXTFortiGate2HAsyncIP",
+                        "EXTFortiGate2HAmgmtIP",
+                        "EXTInstanceType",
+                        "EXTFortiGate1ConfigFile",
+                        "EXTFortiGate2ConfigFile"
+                    ]
+                },
+                {
+                    "Label": {
+                        "default": "Spoke1 VPC configuration"
+                    },
+                    "Parameters": [
+                        "Spoke1VpcCidr",
+                        "Spoke1Private1Subnet",
+                        "Spoke1Private2Subnet"
+                    ]
+                },
+                {
+                    "Label": {
+                        "default": "Spoke2 VPC configuration"
+                    },
+                    "Parameters": [
+                        "Spoke2VpcCidr",
+                        "Spoke2Private1Subnet",
+                        "Spoke2Private2Subnet"
+                    ]
+                }
+            ],
+            "ParameterLabels": {}
+        }
+    },
+    "Outputs": {}
+}

@@ -1,0 +1,288 @@
+{
+    "AWSTemplateFormatVersion": "2010-09-09",
+    "Description": "(1.0) AWS CloudFormation Template for MY LAB - Create VPCs and TGW",
+    "Parameters": {
+        "SpokeVPCCIDR": {
+            "Type": "String",
+            "Default": "10.64.0.0/16",
+            "Description": "Enter the VPC CIDR for the Security Hub VPC you want to use"
+        },
+        "SpokeAZForSubnet1": {
+            "Type": "AWS::EC2::AvailabilityZone::Name",
+            "Description": "Enter the AZ for the primary subnets"
+        },
+        "SpokeAZForSubnet2": {
+            "Type": "AWS::EC2::AvailabilityZone::Name",
+            "Description": "Enter the AZ for the secondary subnets"
+        },
+        "SpokePrivate1Subnet": {
+            "Type": "String",
+            "Default": "10.64.1.0/24",
+            "Description": "Enter the value of the Private1 subnet"
+        },
+        "SpokePrivate2Subnet": {
+            "Type": "String",
+            "Default": "10.64.2.0/24",
+            "Description": "Enter the value of the Private2 subnet"
+        },
+        "ResourceTAG": {
+            "Type": "String",
+            "Default": "Training",
+            "Description": "Enter the Resource name prefix"
+        },
+        "ResourceTagname": {
+            "Type": "String",
+            "Default": "Internal",
+            "Description": "Enter the Resource name prefix"
+        },
+        "TransitGateway": {
+            "Type": "String"
+        },
+        "TransitGatewayRouteTableid": {
+            "Type": "String"
+        }
+    },
+    "Conditions": {},
+    "Resources": {
+        "SpokeVPCID": {
+            "Type": "AWS::EC2::VPC",
+            "Properties": {
+                "CidrBlock": {
+                    "Ref": "SpokeVPCCIDR"
+                },
+                "EnableDnsSupport": "true",
+                "EnableDnsHostnames": "true",
+                "Tags": [
+                    {
+                        "Key": "Name",
+                        "Value": {
+                            "Fn::Join": [
+                                "-",
+                                [
+                                    {
+                                        "Ref": "ResourceTAG"
+                                    },
+                                    {
+                                        "Ref": "ResourceTagname"
+                                    },
+                                    "vpc"
+                                ]
+                            ]
+                        }
+                    }
+                ]
+            }
+        },
+        "SpokePrivate1SubnetID": {
+            "Type": "AWS::EC2::Subnet",
+            "Properties": {
+                "VpcId": {
+                    "Ref": "SpokeVPCID"
+                },
+                "CidrBlock": {
+                    "Ref": "SpokePrivate1Subnet"
+                },
+                "AvailabilityZone": {
+                    "Ref": "SpokeAZForSubnet1"
+                },
+                "Tags": [
+                    {
+                        "Key": "Name",
+                        "Value": {
+                            "Fn::Join": [
+                                "-",
+                                [
+                                    {
+                                        "Ref": "ResourceTAG"
+                                    },
+                                    {
+                                        "Ref": "ResourceTagname"
+                                    },
+                                    "PrivateSubnet1"
+                                ]
+                            ]
+                        }
+                    }
+                ]
+            }
+        },
+        "SpokePrivate2SubnetID": {
+            "Type": "AWS::EC2::Subnet",
+            "Properties": {
+                "VpcId": {
+                    "Ref": "SpokeVPCID"
+                },
+                "CidrBlock": {
+                    "Ref": "SpokePrivate2Subnet"
+                },
+                "AvailabilityZone": {
+                    "Ref": "SpokeAZForSubnet2"
+                },
+                "Tags": [
+                    {
+                        "Key": "Name",
+                        "Value": {
+                            "Fn::Join": [
+                                "-",
+                                [
+                                    {
+                                        "Ref": "ResourceTAG"
+                                    },
+                                    {
+                                        "Ref": "ResourceTagname"
+                                    },
+                                    "PrivateSubnet2"
+                                ]
+                            ]
+                        }
+                    }
+                ]
+            }
+        },
+        "SpokeRouteTable": {
+            "Type": "AWS::EC2::RouteTable",
+            "Properties": {
+                "VpcId": {
+                    "Ref": "SpokeVPCID"
+                },
+                "Tags": [
+                    {
+                        "Key": "Name",
+                        "Value": {
+                            "Fn::Join": [
+                                "-",
+                                [
+                                    {
+                                        "Ref": "ResourceTAG"
+                                    },
+                                    {
+                                        "Ref": "ResourceTagname"
+                                    },
+                                    "RTB"
+                                ]
+                            ]
+                        }
+                    }
+                ]
+            }
+        },
+        "SpokeRouteTableAssociation1": {
+            "Type": "AWS::EC2::SubnetRouteTableAssociation",
+            "Properties": {
+                "SubnetId": {
+                    "Ref": "SpokePrivate1SubnetID"
+                },
+                "RouteTableId": {
+                    "Ref": "SpokeRouteTable"
+                }
+            }
+        },
+        "SpokeRouteTableAssociation2": {
+            "Type": "AWS::EC2::SubnetRouteTableAssociation",
+            "Properties": {
+                "SubnetId": {
+                    "Ref": "SpokePrivate2SubnetID"
+                },
+                "RouteTableId": {
+                    "Ref": "SpokeRouteTable"
+                }
+            }
+        },
+        "SpokeVPCAtt": {
+            "Type": "AWS::EC2::TransitGatewayAttachment",
+            "Properties": {
+                "TransitGatewayId": {
+                    "Ref": "TransitGateway"
+                },
+                "VpcId": {
+                    "Ref": "SpokeVPCID"
+                },
+                "SubnetIds": [
+                    {
+                        "Ref": "SpokePrivate1SubnetID"
+                    },
+                    {
+                        "Ref": "SpokePrivate2SubnetID"
+                    }
+                ],
+                "Tags": [
+                    {
+                        "Key": "Name",
+                        "Value": {
+                            "Fn::Join": [
+                                "-",
+                                [
+                                    {
+                                        "Ref": "ResourceTAG"
+                                    },
+                                    {
+                                        "Ref": "ResourceTagname"
+                                    },
+                                    "TGW-Attach"
+                                ]
+                            ]
+                        }
+                    }
+                ]
+            }
+        },
+        "TransitGatewayAssociationHubVPC": {
+            "Type": "AWS::EC2::TransitGatewayRouteTableAssociation",
+            "Properties": {
+                "TransitGatewayAttachmentId": {
+                    "Ref": "SpokeVPCAtt"
+                },
+                "TransitGatewayRouteTableId": {
+                    "Ref": "TransitGatewayRouteTableid"
+                }
+            }
+        },
+        "SpokeRTBRoute1": {
+            "Type": "AWS::EC2::Route",
+            "Properties": {
+                "RouteTableId": {
+                    "Ref": "SpokeRouteTable"
+                },
+                "DestinationCidrBlock": "0.0.0.0/0",
+                "TransitGatewayId": {
+                    "Ref": "TransitGateway"
+                }
+            },
+            "DependsOn": [
+                "SpokeVPCAtt"
+            ]
+        }
+    },
+    "Outputs": {
+        "SpokeVPCID": {
+            "Description": "HUB VPC ID",
+            "Value": {
+                "Ref": "SpokeVPCID"
+            }
+        },
+        "SpokePrivate1SubnetID": {
+            "Description": "Spoke Subnet1  ID",
+            "Value": {
+                "Ref": "SpokePrivate1SubnetID"
+            }
+        },
+        "SpokePrivate2SubnetID": {
+            "Description": "Spoke Subnet2  ID",
+            "Value": {
+                "Ref": "SpokePrivate2SubnetID"
+            }
+        },
+        "SpokeRouteTableID": {
+            "Description": "Spoke Route Table ID",
+            "Value": {
+                "Ref": "SpokeRouteTable"
+            }
+        },
+        "SpokeVPCAtt": {
+            "Description": "Spoke VPC Att  ID",
+            "Value": {
+                "Ref": "SpokeVPCAtt"
+            }
+        }
+    }
+}

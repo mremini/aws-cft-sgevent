@@ -1,0 +1,851 @@
+{
+    "AWSTemplateFormatVersion": "2010-09-09",
+    "Description": "(1.0) AWS CloudFormation Template for MY LAB - Create VPCs and TGW",
+    "Parameters": {
+        "HubVPCCIDR": {
+            "Type": "String",
+            "Default": "192.168.64.0/18",
+            "Description": "Enter the VPC CIDR for the Security Hub VPC you want to use"
+        },
+        "HubAZForSubnet1": {
+            "Type": "AWS::EC2::AvailabilityZone::Name",
+            "Description": "Enter the AZ for the primary subnets"
+        },
+        "HubAZForSubnet2": {
+            "Type": "AWS::EC2::AvailabilityZone::Name",
+            "Description": "Enter the AZ for the secondary subnets"
+        },
+        "HubPublic1Subnet": {
+            "Type": "String",
+            "Default": "192.168.64.0/24",
+            "Description": "Enter the value of the Public1 subnet"
+        },
+        "HubPublic2Subnet": {
+            "Type": "String",
+            "Default": "192.168.65.0/24",
+            "Description": "Enter the value of the Public2 subnet"
+        },
+        "HubPrivate1Subnet": {
+            "Type": "String",
+            "Default": "192.168.66.0/24",
+            "Description": "Enter the value of the Private1 subnet"
+        },
+        "HubPrivate2Subnet": {
+            "Type": "String",
+            "Default": "192.168.67.0/24",
+            "Description": "Enter the value of the Private2 subnet"
+        },
+        "Hubha1Subnet": {
+            "Type": "String",
+            "Default": "192.168.68.0/24",
+            "Description": "Enter the value of the HA1 subnet"
+        },
+        "Hubha2Subnet": {
+            "Type": "String",
+            "Default": "192.168.69.0/24",
+            "Description": "Enter the value of the HA2 subnet"
+        },
+        "HubMgmt1Subnet": {
+            "Type": "String",
+            "Default": "192.168.70.0/24",
+            "Description": "Enter the value of the Management Subnet "
+        },
+        "HubMgmt2Subnet": {
+            "Type": "String",
+            "Default": "192.168.71.0/24",
+            "Description": "Enter the value of the Management Subnet "
+        },
+        "HubTGWAttSubnet1": {
+            "Type": "String",
+            "Default": "192.168.126.0/24",
+            "Description": "Enter the value of the TGW Attachement1 Subnet "
+        },
+        "HubTGWAttSubnet2": {
+            "Type": "String",
+            "Default": "192.168.127.0/24",
+            "Description": "Enter the value of the TGW Attachement2 Subnet "
+        },
+        "ResourceTAG": {
+            "Type": "String",
+            "Default": "Training",
+            "Description": "Enter the Resource name prefix"
+        },
+        "ResourceTagname": {
+            "Type": "String",
+            "Default": "Internal",
+            "Description": "Enter the Resource name prefix"
+        },
+        "TransitGateway": {
+            "Type": "String"
+        },
+        "TransitGatewayRouteTableid": {
+            "Type": "String"
+        }
+    },
+    "Conditions": {},
+    "Resources": {
+        "HubVPCID": {
+            "Type": "AWS::EC2::VPC",
+            "Properties": {
+                "CidrBlock": {
+                    "Ref": "HubVPCCIDR"
+                },
+                "EnableDnsSupport": "true",
+                "EnableDnsHostnames": "true",
+                "Tags": [
+                    {
+                        "Key": "Name",
+                        "Value": {
+                            "Fn::Join": [
+                                "-",
+                                [
+                                    {
+                                        "Ref": "ResourceTAG"
+                                    },
+                                    {
+                                        "Ref": "ResourceTagname"
+                                    },
+                                    "vpc"
+                                ]
+                            ]
+                        }
+                    }
+                ]
+            }
+        },
+        "HubPublic1SubnetID": {
+            "Type": "AWS::EC2::Subnet",
+            "Properties": {
+                "VpcId": {
+                    "Ref": "HubVPCID"
+                },
+                "CidrBlock": {
+                    "Ref": "HubPublic1Subnet"
+                },
+                "AvailabilityZone": {
+                    "Ref": "HubAZForSubnet1"
+                },
+                "Tags": [
+                    {
+                        "Key": "Name",
+                        "Value": {
+                            "Fn::Join": [
+                                "-",
+                                [
+                                    {
+                                        "Ref": "ResourceTAG"
+                                    },
+                                    {
+                                        "Ref": "ResourceTagname"
+                                    },
+                                    "PublicSubnet1"
+                                ]
+                            ]
+                        }
+                    }
+                ]
+            }
+        },
+        "HubPublic2SubnetID": {
+            "Type": "AWS::EC2::Subnet",
+            "Properties": {
+                "VpcId": {
+                    "Ref": "HubVPCID"
+                },
+                "CidrBlock": {
+                    "Ref": "HubPublic2Subnet"
+                },
+                "AvailabilityZone": {
+                    "Ref": "HubAZForSubnet2"
+                },
+                "Tags": [
+                    {
+                        "Key": "Name",
+                        "Value": {
+                            "Fn::Join": [
+                                "-",
+                                [
+                                    {
+                                        "Ref": "ResourceTAG"
+                                    },
+                                    {
+                                        "Ref": "ResourceTagname"
+                                    },
+                                    "PublicSubnet2"
+                                ]
+                            ]
+                        }
+                    }
+                ]
+            }
+        },
+        "HubPrivate1SubnetID": {
+            "Type": "AWS::EC2::Subnet",
+            "Properties": {
+                "VpcId": {
+                    "Ref": "HubVPCID"
+                },
+                "CidrBlock": {
+                    "Ref": "HubPrivate1Subnet"
+                },
+                "AvailabilityZone": {
+                    "Ref": "HubAZForSubnet1"
+                },
+                "Tags": [
+                    {
+                        "Key": "Name",
+                        "Value": {
+                            "Fn::Join": [
+                                "-",
+                                [
+                                    {
+                                        "Ref": "ResourceTAG"
+                                    },
+                                    {
+                                        "Ref": "ResourceTagname"
+                                    },
+                                    "PrivateSubnet1"
+                                ]
+                            ]
+                        }
+                    }
+                ]
+            }
+        },
+        "HubPrivate2SubnetID": {
+            "Type": "AWS::EC2::Subnet",
+            "Properties": {
+                "VpcId": {
+                    "Ref": "HubVPCID"
+                },
+                "CidrBlock": {
+                    "Ref": "HubPrivate2Subnet"
+                },
+                "AvailabilityZone": {
+                    "Ref": "HubAZForSubnet2"
+                },
+                "Tags": [
+                    {
+                        "Key": "Name",
+                        "Value": {
+                            "Fn::Join": [
+                                "-",
+                                [
+                                    {
+                                        "Ref": "ResourceTAG"
+                                    },
+                                    {
+                                        "Ref": "ResourceTagname"
+                                    },
+                                    "PrivateSubnet2"
+                                ]
+                            ]
+                        }
+                    }
+                ]
+            }
+        },
+        "HubHA1SubnetID": {
+            "Type": "AWS::EC2::Subnet",
+            "Properties": {
+                "VpcId": {
+                    "Ref": "HubVPCID"
+                },
+                "CidrBlock": {
+                    "Ref": "Hubha1Subnet"
+                },
+                "AvailabilityZone": {
+                    "Ref": "HubAZForSubnet1"
+                },
+                "Tags": [
+                    {
+                        "Key": "Name",
+                        "Value": {
+                            "Fn::Join": [
+                                "-",
+                                [
+                                    {
+                                        "Ref": "ResourceTAG"
+                                    },
+                                    {
+                                        "Ref": "ResourceTagname"
+                                    },
+                                    "HASubnet1"
+                                ]
+                            ]
+                        }
+                    }
+                ]
+            }
+        },
+        "HubHA2SubnetID": {
+            "Type": "AWS::EC2::Subnet",
+            "Properties": {
+                "VpcId": {
+                    "Ref": "HubVPCID"
+                },
+                "CidrBlock": {
+                    "Ref": "Hubha2Subnet"
+                },
+                "AvailabilityZone": {
+                    "Ref": "HubAZForSubnet2"
+                },
+                "Tags": [
+                    {
+                        "Key": "Name",
+                        "Value": {
+                            "Fn::Join": [
+                                "-",
+                                [
+                                    {
+                                        "Ref": "ResourceTAG"
+                                    },
+                                    {
+                                        "Ref": "ResourceTagname"
+                                    },
+                                    "HASubnet2"
+                                ]
+                            ]
+                        }
+                    }
+                ]
+            }
+        },
+        "HubMGMT1SubnetID": {
+            "Type": "AWS::EC2::Subnet",
+            "Properties": {
+                "VpcId": {
+                    "Ref": "HubVPCID"
+                },
+                "CidrBlock": {
+                    "Ref": "HubMgmt1Subnet"
+                },
+                "AvailabilityZone": {
+                    "Ref": "HubAZForSubnet1"
+                },
+                "Tags": [
+                    {
+                        "Key": "Name",
+                        "Value": {
+                            "Fn::Join": [
+                                "-",
+                                [
+                                    {
+                                        "Ref": "ResourceTAG"
+                                    },
+                                    {
+                                        "Ref": "ResourceTagname"
+                                    },
+                                    "MGMTSubnet1"
+                                ]
+                            ]
+                        }
+                    }
+                ]
+            }
+        },
+        "HubMGMT2SubnetID": {
+            "Type": "AWS::EC2::Subnet",
+            "Properties": {
+                "VpcId": {
+                    "Ref": "HubVPCID"
+                },
+                "CidrBlock": {
+                    "Ref": "HubMgmt2Subnet"
+                },
+                "AvailabilityZone": {
+                    "Ref": "HubAZForSubnet2"
+                },
+                "Tags": [
+                    {
+                        "Key": "Name",
+                        "Value": {
+                            "Fn::Join": [
+                                "-",
+                                [
+                                    {
+                                        "Ref": "ResourceTAG"
+                                    },
+                                    {
+                                        "Ref": "ResourceTagname"
+                                    },
+                                    "MGMTSubnet2"
+                                ]
+                            ]
+                        }
+                    }
+                ]
+            }
+        },
+        "HubTGWAttSubnet1ID": {
+            "Type": "AWS::EC2::Subnet",
+            "Properties": {
+                "VpcId": {
+                    "Ref": "HubVPCID"
+                },
+                "CidrBlock": {
+                    "Ref": "HubTGWAttSubnet1"
+                },
+                "AvailabilityZone": {
+                    "Ref": "HubAZForSubnet1"
+                },
+                "Tags": [
+                    {
+                        "Key": "Name",
+                        "Value": {
+                            "Fn::Join": [
+                                "-",
+                                [
+                                    {
+                                        "Ref": "ResourceTAG"
+                                    },
+                                    {
+                                        "Ref": "ResourceTagname"
+                                    },
+                                    "TGWAttSubnet1"
+                                ]
+                            ]
+                        }
+                    }
+                ]
+            }
+        },
+        "HubTGWAttSubnet2ID": {
+            "Type": "AWS::EC2::Subnet",
+            "Properties": {
+                "VpcId": {
+                    "Ref": "HubVPCID"
+                },
+                "CidrBlock": {
+                    "Ref": "HubTGWAttSubnet2"
+                },
+                "AvailabilityZone": {
+                    "Ref": "HubAZForSubnet2"
+                },
+                "Tags": [
+                    {
+                        "Key": "Name",
+                        "Value": {
+                            "Fn::Join": [
+                                "-",
+                                [
+                                    {
+                                        "Ref": "ResourceTAG"
+                                    },
+                                    {
+                                        "Ref": "ResourceTagname"
+                                    },
+                                    "TGWAttSubnet2"
+                                ]
+                            ]
+                        }
+                    }
+                ]
+            }
+        },
+        "InternetGateway": {
+            "Type": "AWS::EC2::InternetGateway",
+            "Properties": {
+                "Tags": [
+                    {
+                        "Key": "Name",
+                        "Value": {
+                            "Fn::Join": [
+                                "-",
+                                [
+                                    {
+                                        "Ref": "ResourceTAG"
+                                    },
+                                    {
+                                        "Ref": "ResourceTagname"
+                                    },
+                                    "Hub-IGW"
+                                ]
+                            ]
+                        }
+                    }
+                ]
+            }
+        },
+        "AttachGateway": {
+            "Type": "AWS::EC2::VPCGatewayAttachment",
+            "Properties": {
+                "VpcId": {
+                    "Ref": "HubVPCID"
+                },
+                "InternetGatewayId": {
+                    "Ref": "InternetGateway"
+                }
+            }
+        },
+        "HubPublicRouteTable": {
+            "Type": "AWS::EC2::RouteTable",
+            "Properties": {
+                "VpcId": {
+                    "Ref": "HubVPCID"
+                },
+                "Tags": [
+                    {
+                        "Key": "Name",
+                        "Value": {
+                            "Fn::Join": [
+                                "-",
+                                [
+                                    {
+                                        "Ref": "ResourceTAG"
+                                    },
+                                    {
+                                        "Ref": "ResourceTagname"
+                                    },
+                                    "Public-RTB"
+                                ]
+                            ]
+                        }
+                    }
+                ]
+            }
+        },
+        "HubFromTGWRTB": {
+            "Type": "AWS::EC2::RouteTable",
+            "Properties": {
+                "VpcId": {
+                    "Ref": "HubVPCID"
+                },
+                "Tags": [
+                    {
+                        "Key": "Name",
+                        "Value": {
+                            "Fn::Join": [
+                                "-",
+                                [
+                                    {
+                                        "Ref": "ResourceTAG"
+                                    },
+                                    {
+                                        "Ref": "ResourceTagname"
+                                    },
+                                    "FromTGW-RTB"
+                                ]
+                            ]
+                        }
+                    }
+                ]
+            }
+        },
+        "HubPrivateRTB": {
+            "Type": "AWS::EC2::RouteTable",
+            "Properties": {
+                "VpcId": {
+                    "Ref": "HubVPCID"
+                },
+                "Tags": [
+                    {
+                        "Key": "Name",
+                        "Value": {
+                            "Fn::Join": [
+                                "-",
+                                [
+                                    {
+                                        "Ref": "ResourceTAG"
+                                    },
+                                    {
+                                        "Ref": "ResourceTagname"
+                                    },
+                                    "Private-RTB"
+                                ]
+                            ]
+                        }
+                    }
+                ]
+            }
+        },
+        "HubMGMTRouteTable": {
+            "Type": "AWS::EC2::RouteTable",
+            "Properties": {
+                "VpcId": {
+                    "Ref": "HubVPCID"
+                },
+                "Tags": [
+                    {
+                        "Key": "Name",
+                        "Value": {
+                            "Fn::Join": [
+                                "-",
+                                [
+                                    {
+                                        "Ref": "ResourceTAG"
+                                    },
+                                    {
+                                        "Ref": "ResourceTagname"
+                                    },
+                                    "Mgmt-RTB"
+                                ]
+                            ]
+                        }
+                    }
+                ]
+            }
+        },
+        "PublicRouteTableAssociation1": {
+            "Type": "AWS::EC2::SubnetRouteTableAssociation",
+            "Properties": {
+                "SubnetId": {
+                    "Ref": "HubPublic1SubnetID"
+                },
+                "RouteTableId": {
+                    "Ref": "HubPublicRouteTable"
+                }
+            }
+        },
+        "PublicRouteTableAssociation2": {
+            "Type": "AWS::EC2::SubnetRouteTableAssociation",
+            "Properties": {
+                "SubnetId": {
+                    "Ref": "HubPublic2SubnetID"
+                },
+                "RouteTableId": {
+                    "Ref": "HubPublicRouteTable"
+                }
+            }
+        },
+        "HubFromTGWRouteTableAssociation1": {
+            "Type": "AWS::EC2::SubnetRouteTableAssociation",
+            "Properties": {
+                "SubnetId": {
+                    "Ref": "HubTGWAttSubnet1ID"
+                },
+                "RouteTableId": {
+                    "Ref": "HubFromTGWRTB"
+                }
+            }
+        },
+        "HubFromTGWRouteTableAssociation2": {
+            "Type": "AWS::EC2::SubnetRouteTableAssociation",
+            "Properties": {
+                "SubnetId": {
+                    "Ref": "HubTGWAttSubnet2ID"
+                },
+                "RouteTableId": {
+                    "Ref": "HubFromTGWRTB"
+                }
+            }
+        },
+        "HubPrivateRouteTableAssociation1": {
+            "Type": "AWS::EC2::SubnetRouteTableAssociation",
+            "Properties": {
+                "SubnetId": {
+                    "Ref": "HubPrivate1SubnetID"
+                },
+                "RouteTableId": {
+                    "Ref": "HubPrivateRTB"
+                }
+            }
+        },
+        "HubPrivateRouteTableAssociation2": {
+            "Type": "AWS::EC2::SubnetRouteTableAssociation",
+            "Properties": {
+                "SubnetId": {
+                    "Ref": "HubPrivate2SubnetID"
+                },
+                "RouteTableId": {
+                    "Ref": "HubPrivateRTB"
+                }
+            }
+        },
+        "HubMGMTRouteTableAssociation1": {
+            "Type": "AWS::EC2::SubnetRouteTableAssociation",
+            "Properties": {
+                "SubnetId": {
+                    "Ref": "HubMGMT1SubnetID"
+                },
+                "RouteTableId": {
+                    "Ref": "HubMGMTRouteTable"
+                }
+            }
+        },
+        "HubMGMTRouteTableAssociation2": {
+            "Type": "AWS::EC2::SubnetRouteTableAssociation",
+            "Properties": {
+                "SubnetId": {
+                    "Ref": "HubMGMT2SubnetID"
+                },
+                "RouteTableId": {
+                    "Ref": "HubMGMTRouteTable"
+                }
+            }
+        },
+        "HubVPCAtt": {
+            "Type": "AWS::EC2::TransitGatewayAttachment",
+            "Properties": {
+                "TransitGatewayId": {
+                    "Ref": "TransitGateway"
+                },
+                "VpcId": {
+                    "Ref": "HubVPCID"
+                },
+                "SubnetIds": [
+                    {
+                        "Ref": "HubTGWAttSubnet1ID"
+                    },
+                    {
+                        "Ref": "HubTGWAttSubnet2ID"
+                    }
+                ],
+                "Tags": [
+                    {
+                        "Key": "Name",
+                        "Value": {
+                            "Fn::Join": [
+                                "-",
+                                [
+                                    {
+                                        "Ref": "ResourceTAG"
+                                    },
+                                    {
+                                        "Ref": "ResourceTagname"
+                                    },
+                                    "TGW-Attach"
+                                ]
+                            ]
+                        }
+                    }
+                ]
+            }
+        },
+        "TransitGatewayAssociationHubVPC": {
+            "Type": "AWS::EC2::TransitGatewayRouteTableAssociation",
+            "Properties": {
+                "TransitGatewayAttachmentId": {
+                    "Ref": "HubVPCAtt"
+                },
+                "TransitGatewayRouteTableId": {
+                    "Ref": "TransitGatewayRouteTableid"
+                }
+            }
+        },
+        "HubMGMTRTBRoute1": {
+            "Type": "AWS::EC2::Route",
+            "DependsOn": "AttachGateway",
+            "Properties": {
+                "RouteTableId": {
+                    "Ref": "HubMGMTRouteTable"
+                },
+                "DestinationCidrBlock": "0.0.0.0/0",
+                "GatewayId": {
+                    "Ref": "InternetGateway"
+                }
+            }
+        },
+        "HubPublicRTBRoute1": {
+            "Type": "AWS::EC2::Route",
+            "DependsOn": "AttachGateway",
+            "Properties": {
+                "RouteTableId": {
+                    "Ref": "HubPublicRouteTable"
+                },
+                "DestinationCidrBlock": "0.0.0.0/0",
+                "GatewayId": {
+                    "Ref": "InternetGateway"
+                }
+            }
+        },
+        "HubPrivateRTBRoute1": {
+            "Type": "AWS::EC2::Route",
+            "Properties": {
+                "RouteTableId": {
+                    "Ref": "HubPrivateRTB"
+                },
+                "DestinationCidrBlock": "10.0.0.0/8",
+                "TransitGatewayId": {
+                    "Ref": "TransitGateway"
+                }
+            },
+            "DependsOn": [
+                "HubVPCAtt"
+            ]
+        },
+        "HubPrivateRTBRoute2": {
+            "Type": "AWS::EC2::Route",
+            "Properties": {
+                "RouteTableId": {
+                    "Ref": "HubPrivateRTB"
+                },
+                "DestinationCidrBlock": "192.168.0.0/16",
+                "TransitGatewayId": {
+                    "Ref": "TransitGateway"
+                }
+            },
+            "DependsOn": [
+                "HubVPCAtt"
+            ]
+        }
+    },
+    "Outputs": {
+        "HubVPCID": {
+            "Description": "HUB VPC ID",
+            "Value": {
+                "Ref": "HubVPCID"
+            }
+        },
+        "HubPublic1SubnetID": {
+            "Description": "Public Subnet1  ID",
+            "Value": {
+                "Ref": "HubPublic1SubnetID"
+            }
+        },
+        "HubPublic2SubnetID": {
+            "Description": "Public Subnet2  ID",
+            "Value": {
+                "Ref": "HubPublic2SubnetID"
+            }
+        },
+        "HubPrivate1SubnetID": {
+            "Description": "Private Subnet2  ID",
+            "Value": {
+                "Ref": "HubPrivate1SubnetID"
+            }
+        },
+        "HubPrivate2SubnetID": {
+            "Description": "Private Subnet2  ID",
+            "Value": {
+                "Ref": "HubPrivate2SubnetID"
+            }
+        },
+        "HubHA1SubnetID": {
+            "Description": "HA Subnet1 ID",
+            "Value": {
+                "Ref": "HubHA1SubnetID"
+            }
+        },
+        "HubHA2SubnetID": {
+            "Description": "HA Subnet2 ID",
+            "Value": {
+                "Ref": "HubHA2SubnetID"
+            }
+        },
+        "HubMGMT1SubnetID": {
+            "Description": "MGMT Subnet1 ID",
+            "Value": {
+                "Ref": "HubMGMT1SubnetID"
+            }
+        },
+        "HubMGMT2SubnetID": {
+            "Description": "MGMT Subnet2 ID",
+            "Value": {
+                "Ref": "HubMGMT2SubnetID"
+            }
+        },
+        "HubPublicRouteTableID": {
+            "Description": "Public Route Table ID",
+            "Value": {
+                "Ref": "HubPublicRouteTable"
+            }
+        },
+        "HubVPCAttID": {
+            "Description": "Hub VPC to TGW Attachment",
+            "Value": {
+                "Ref": "HubVPCAtt"
+            }
+        }
+    }
+}
